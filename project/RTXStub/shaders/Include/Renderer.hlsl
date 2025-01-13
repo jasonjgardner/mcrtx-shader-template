@@ -87,7 +87,7 @@ void RenderVanilla(HitInfo hitInfo, inout RayState rayState)
     light = lerp(light, 1, surfaceInfo.emissive);
 
     // Calculate point lights.
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < min(10, g_view.cpuLightsCount); i++)
     {
         LightInfo lightInfo = inputLightsBuffer[i];
         LightData lightData = UnpackLight(lightInfo.packedData);
