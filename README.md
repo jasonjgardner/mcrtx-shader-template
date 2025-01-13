@@ -32,7 +32,7 @@ In order to compile RTX shaders in `project/` folder, the following is required:
 - Python 3.10+ (3.12 is recommended, and it's best to install it from Microsoft Store)
 - [Lazurite](https://github.com/veka0/lazurite), which is a python library & CLI tool for creating and working with bedrock shaders
 - [DXC](https://github.com/microsoft/DirectXShaderCompiler/releases) compiler executable, necessary to compile core ray tracing shaders from RTXStub
-- [Shaderc](https://github.com/veka0/bgfx-mcbe/releases/tag/binaries) compiler executable, necessary to compile PostFX shaders, written in a GLSL-like language
+- [Shaderc](https://github.com/veka0/bgfx-mcbe/releases/tag/binaries) compiler executable, necessary to compile PostFX shaders, written in a [GLSL-like language](https://bkaradzic.github.io/bgfx/tools.html#shader-compiler-shaderc)
 - Copying vanilla material.bin files into the `vanilla/` folder. Specifically, `RTXStub.material.bin`, `RTXPostFX.Bloom.material.bin` and `RTXPostFX.Tonemapping.material.bin` are required
 
 Once all requirements are satisfied, place compiler executables into the root folder of this repository, then open a command prompt and run `lazurite build project/ -o ./` which will compile all shaders and output material.bin files in the current directory. See lazurite [documentation](https://veka0.github.io/lazurite/) for additional customization options.
