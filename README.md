@@ -41,7 +41,7 @@ Once all requirements are satisfied, place compiler executables into the root fo
 
 ### RTXStub
 
-This is a table with high-level description of MCRTX pipeline
+This is a table with high-level description of MCRTX pipeline, sorted in the sequential order of dispatches
 
 Dispatch Grid legend
 
@@ -109,6 +109,8 @@ Unused passes
 | DrawLights                | Debug visualization of lights                 |
 
 ### PostFX
+
+PostFX render passes, sorted in their draw order
 
 - BloomDownscaleUniformPass (RTXPostFX.Bloom)
 - BloomDownscaleGaussianPass (RTXPostFX.Bloom, renders 4 times)
