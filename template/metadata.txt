@@ -1,0 +1,8 @@
+This file contains additional generated data.
+
+List of all template keys:
+{{metadata.keys}}
+
+
+List of all compute passes and their group size:
+{{RTXStub.passes_and_group_size}}
