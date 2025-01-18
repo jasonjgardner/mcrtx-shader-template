@@ -11,7 +11,7 @@ void CopyToFinal(
     // *cricket noises*
     // Note that g_rootConstant0 from FinalCombine pass is accessible here
 
-    if (any(dispatchThreadID.xy > g_view.displayResolution)) return;
+    if (any(dispatchThreadID.xy >= g_view.displayResolution)) return;
 
     bool enabledUpscaling = !g_view.enableTAA && g_view.renderResolution.x < g_view.displayResolution.x;
     if (enabledUpscaling) {

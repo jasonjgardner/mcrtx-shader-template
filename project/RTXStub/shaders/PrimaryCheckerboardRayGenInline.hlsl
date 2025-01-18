@@ -15,7 +15,7 @@ void PrimaryCheckerboardRayGenInline(
     
 
     // Below is an implementation of a basic ray traced vanilla-like shader.
-    if (any(dispatchThreadID.xy > g_view.renderResolution)) return;
+    if (any(dispatchThreadID.xy >= g_view.renderResolution)) return;
 
     bool enabledUpscaling = !g_view.enableTAA && g_view.renderResolution.x < g_view.displayResolution.x;
 
