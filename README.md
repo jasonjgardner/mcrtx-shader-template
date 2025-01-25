@@ -37,6 +37,28 @@ In order to compile RTX shaders in `project/` folder, the following is required:
 
 Once all requirements are satisfied, place compiler executables into the root folder of this repository, then open a command prompt and run `lazurite build project/ -o ./` which will compile all shaders and output material.bin files in the current directory. See lazurite [documentation](https://veka0.github.io/lazurite/) for additional customization options.
 
+## Example Implementation
+
+Shader code that comes with this repository implements basic rendering logic that produces vanilla-like visuals.
+
+Included features:
+
+- Vanilla-inspired shading
+- Accurate vanilla material implementation (`MaterialVanilla()`), which was created to reflect vanilla material logic for terrain and entities as accurately as possible
+- Point lights
+- PBR textures
+- Fixes for some common RTX bugs (banner UVs, door/cloud vertex shading, darkening of certain items)
+- Upscaling support (DLSS, etc)
+- Complete resource signature of MCRTX pipeline (see `RTXStub/Include/Generated/`)
+- Root constants in every pass
+- Entity skinning implementation
+
+The following render passes are part of the example implementation:
+
+- `PreBlasSkinning` - necessary pass to animate geometry of actors and entities as well as to create their motion vectors.
+- `PrimaryCheckerboardRayGenInline` - main ray tracing shader logic.
+- `CopyToFinal` - transfers upscaled image to final output buffer.
+
 ## Pipeline Overview
 
 ### RTXStub
@@ -66,7 +88,7 @@ Dispatch Grid legend
 | SunShadowRayGenInline                    | (4, 8, 1)   | Render                                   |                                                                                    |
 | AdaptiveDenoiserGenerateReferenceInline  | (4, 8, 1)   | Denoiser                                 |                                                                                    |
 | TileClassification                       | (16, 16, 1) | Render                                   |                                                                                    |
-| BlurGradients                            | (128, 1, 1) | Denoiser\*                               | Alternates between XY and YX coordinates, dispatched 4 times                       |
+| BlurGradients                            | (128, 1, 1) | Denoiser\*                               | Dispatched 4 times, alternates between XY and YX coordinates                       |
 | RefractionRayGenInline                   | (4, 8, 1)   | Render                                   |                                                                                    |
 | DiffuseRayGenCombinedInline              | (4, 8, 1)   | Render                                   |                                                                                    |
 | ExplicitLightSamplingInline              | (4, 8, 1)   | Render                                   |                                                                                    |
