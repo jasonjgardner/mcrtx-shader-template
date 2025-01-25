@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 import shutil
 import re
 
@@ -50,6 +49,9 @@ def process_text_file(text: str, token_mapping: dict[str, str]):
 
 
 def analyze_rtxstub(mat: Material, template_token_mapping: dict[str, str]):
+    """
+    Extracts useful data fron RTXStub and populates `template_token_mapping` based on gathered data.
+    """
     print(f"Analyzing {mat.name}...")
 
     resources: dict = {}
@@ -91,41 +93,31 @@ def analyze_rtxstub(mat: Material, template_token_mapping: dict[str, str]):
         else:
             print("???")
 
-    samplers.sort(key=lambda x: x.name)
-    structs.sort(key=lambda x: x.name)
-    cbv_buffers.sort(key=lambda x: x.name)
-    uav_buffers.sort(key=lambda x: x.name)
-    srv_buffers.sort(key=lambda x: x.name)
+    for resource_list in (samplers, structs, cbv_buffers, uav_buffers, srv_buffers):
+        resource_list.sort(key=lambda x: x.name)
 
-    template_token_mapping[f"{mat.name}.samplers"] = "\n".join(str(x) for x in samplers)
-    template_token_mapping[f"{mat.name}.structs"] = "\n".join(str(x) for x in structs)
-    template_token_mapping[f"{mat.name}.CBV"] = "\n".join(str(x) for x in cbv_buffers)
-    template_token_mapping[f"{mat.name}.UAV"] = "\n".join(str(x) for x in uav_buffers)
-    template_token_mapping[f"{mat.name}.SRV"] = "\n".join(str(x) for x in srv_buffers)
+    for resource_list, token_name in (
+        (samplers, "samplers"),
+        (structs, "structs"),
+        (cbv_buffers, "CBV"),
+        (uav_buffers, "UAV"),
+        (srv_buffers, "SRV"),
+    ):
+        template_token_mapping[f"{mat.name}.{token_name}"] = "\n".join(
+            str(x) for x in resource_list
+        )
 
-    for buffer in samplers:
-        key = f"{mat.name}.buffers.s{buffer.register.register}_space{buffer.register.space}"
-        val = template_token_mapping.get(key, "")
-        val += str(buffer)
-        template_token_mapping[key] = val
-
-    for buffer in cbv_buffers:
-        key = f"{mat.name}.buffers.b{buffer.register.register}_space{buffer.register.space}"
-        val = template_token_mapping.get(key, "")
-        val += str(buffer)
-        template_token_mapping[key] = val
-
-    for buffer in uav_buffers:
-        key = f"{mat.name}.buffers.u{buffer.register.register}_space{buffer.register.space}"
-        val = template_token_mapping.get(key, "")
-        val += str(buffer)
-        template_token_mapping[key] = val
-
-    for buffer in srv_buffers:
-        key = f"{mat.name}.buffers.t{buffer.register.register}_space{buffer.register.space}"
-        val = template_token_mapping.get(key, "")
-        val += str(buffer)
-        template_token_mapping[key] = val
+    for buffer_list, register_prefix in (
+        (samplers, "s"),
+        (cbv_buffers, "b"),
+        (uav_buffers, "u"),
+        (srv_buffers, "t"),
+    ):
+        for buffer in buffer_list:
+            key = f"{mat.name}.buffers.{register_prefix}{buffer.register.register}_space{buffer.register.space}"
+            val = template_token_mapping.get(key, "")
+            val += str(buffer)
+            template_token_mapping[key] = val
 
     for shader_pass, (x, y, z) in group_size_mapping.items():
         template_token_mapping[f"{mat.name}.passes.{shader_pass}.group_size"] = (
@@ -133,13 +125,16 @@ def analyze_rtxstub(mat: Material, template_token_mapping: dict[str, str]):
         )
 
     template_token_mapping[f"{mat.name}.passes_and_group_size"] = "\n".join(
-        f"{n} {s}" for n, s in sorted(group_size_mapping.items())
+        f"{name} {size}" for name, size in sorted(group_size_mapping.items())
     )
 
 
 def analyze_postfx_materials(
     mats: list[Material], template_token_mapping: dict[str, str]
 ):
+    """
+    Extracts useful data fron PostFX materials and populates `template_token_mapping` based on gathered data.
+    """
     for mat in mats:
         name = mat.name
 

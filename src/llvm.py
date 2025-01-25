@@ -715,7 +715,14 @@ def parse_resources(
         add_unique_resource(sampler_name, sampler, resources)
 
 
-def parse_llvm(binary: bytes, resources: dict[str, Sampler | BufferSRV]):
+def parse_llvm(
+    binary: bytes,
+    resources: dict[str, Sampler | BufferSRV | BufferUAV | BufferCBV | ShaderStruct],
+):
+    """
+    Parses reflection LLVM bitcode and extracts discovered resources (buffers, structs, samplers).
+    """
+
     llvm_bc = LLVMBitcode()
     llvm_data = llvm_bc.read(binary)
 

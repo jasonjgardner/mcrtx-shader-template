@@ -1,5 +1,4 @@
 import re
-from resources import Register
 
 
 class ReBuffer:
