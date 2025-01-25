@@ -3,6 +3,7 @@
 
 #include "Generated/Signature.hlsl"
 #include "Constants.hlsl"
+#include "Util.hlsl"
 
 struct HitInfo
 {
@@ -71,7 +72,7 @@ GeometryInfo GetGeometryInfo(HitInfo hitInfo, ObjectInstance objectInstance) {
     uint uv3ByteOffset = objectInstance.offsetPack4 & 0xff;
     uint PBRTextureIdByteOffset = objectInstance.offsetPack4 >> 8;
     uint previousPositionOffset = objectInstance.offsetPack5 & 0xff;
-    uint mediaType = objectInstance.offsetPack5 >> 8;
+    uint mediaType = objectInstance.offsetPack5 >> 8; // See MEDIA_TYPE macros.
 
     ByteAddressBuffer vertexBuffer = vertexBuffers[objectInstance.vbIdx];
 
@@ -92,24 +93,21 @@ GeometryInfo GetGeometryInfo(HitInfo hitInfo, ObjectInstance objectInstance) {
     {
         // Note: use vertexOffsetInBaseVertices for vanilla vertexBuffers and vertexOffsetInParallelVertices for custom buffers (face buffers and irradiance cache)
         uint address = (vertices[i] + objectInstance.vertexOffsetInBaseVertices) * objectInstance.vertexStride;
-        // TODO: use Load<T> type casting for packed fields?
-        uint packedUv = vertexBuffer.Load(address + uv0ByteOffset);
-        uint packedColor = vertexBuffer.Load(address + colorByteOffset);
-        uint normalPacked = vertexBuffer.Load(address + normalByteOffset);
-
+   
         positions[i] = vertexBuffer.Load<float16_t4>(address + positionByteOffset).xyz;
         geometryInfo.position += geometryInfo.barycentric[i] * positions[i];
 
         // TODO: sometimes the game may not supply motion vector offset, in that case do we also check for `previousPositionOffset != 0`
         // or should this be left as is, since in that case it will use offset of 0 which is a curent frame position?
         if (objectInstance.flags & kObjectInstanceFlagHasMotionVectors)
+        {
             geometryInfo.previousPosition += geometryInfo.barycentric[i] * vertexBuffer.Load<float16_t4>(address + previousPositionOffset).xyz;
+        }
 
-        uvs[i] = float2(packedUv.x & 0xffff, packedUv.x >> 16) * (1. / 0xffff);
-        uvs[i] = round(uvs[i]*32768)/32768.0; // Quantize UVs according to max possible atlas size (32k on NVidia), fixes visible texture seams on certain objects.
+        geometryInfo.color += geometryInfo.barycentric[i] * unpackVertexColor(vertexBuffer.Load(address + colorByteOffset));
+        geometryInfo.vertexNormal += geometryInfo.barycentric[i] * unpackNormal(vertexBuffer.Load(address + normalByteOffset)).xyz;
+        uvs[i] = unpackVertexUV(vertexBuffer.Load(address + uv0ByteOffset));
         geometryInfo.uv0 += geometryInfo.barycentric[i] * uvs[i];
-        geometryInfo.color += geometryInfo.barycentric[i] * float4((packedColor >> 8 * 0) & 0xff, (packedColor >> 8 * 1) & 0xff, (packedColor >> 8 * 2) & 0xff, (packedColor >> 8 * 3) & 0xff) / 255.0;
-        geometryInfo.vertexNormal += geometryInfo.barycentric[i] * float3((int)((normalPacked << 8 * 3) & 0xff000000) >> 24, (int)((normalPacked << 8 * 2) & 0xff000000) >> 24, (int)((normalPacked << 8 * 1) & 0xff000000) >> 24) / 127.0;
     }
 
     geometryInfo.geometryNormal = normalize(cross((positions[1] - positions[0]), (positions[2] - positions[0])));
@@ -124,13 +122,10 @@ GeometryInfo GetGeometryInfo(HitInfo hitInfo, ObjectInstance objectInstance) {
     // In general form: A * B = C
     // Solution: A = C * transpose(inverse(transpose(B)))
 
-    float2 dUV01 = uvs[1] - uvs[0];
-    float2 dUV02 = uvs[2] - uvs[0];
+    float2 dUV1 = uvs[1] - uvs[0];
+    float2 dUV2 = uvs[2] - uvs[0];
 
-    float3 dp01 = positions[1] - positions[0];
-    float3 dp02 = positions[2] - positions[0];
-
-    float det = dUV01.x * dUV02.y - dUV01.y * dUV02.x;
+    float det = determinant(float2x2(dUV1, dUV2));
 
     if (det == 0.0)
     {
@@ -148,12 +143,16 @@ GeometryInfo GetGeometryInfo(HitInfo hitInfo, ObjectInstance objectInstance) {
         det = det < 0 ? -1 : 1;
 
         // Eliminate 2 multiplications by multiplying float2 instead of float3.
-        dUV01 *= det;
-        dUV02 *= det;
+        dUV1 *= det;
+        dUV2 *= det;
 
-        geometryInfo.tangent = dUV02.y * dp01 - dUV01.y * dp02;
-        geometryInfo.bitangent = dUV01.x * dp02 - dUV02.x * dp01;
+        float3 dPos1 = positions[1] - positions[0];
+        float3 dPos2 = positions[2] - positions[0];
+
+        geometryInfo.tangent = dUV2.y * dPos1 - dUV1.y * dPos2;
+        geometryInfo.bitangent = dUV1.x * dPos2 - dUV2.x * dPos1;
     }
+    // Tip: tangent and bitangent can be pre-calculated from CalculateFaceData pass and stored in faceDataBuffers.
     geometryInfo.tangent = normalize(geometryInfo.tangent);
     geometryInfo.bitangent = normalize(geometryInfo.bitangent);
 
@@ -197,6 +196,126 @@ struct SurfaceInfo
         normal = 0;
     }
 };
+
+// The following material code was created by combining shading logic from Actor, ActorGlint, ActorTint, and ActorMultiTexture materials
+void EvaluateActorMaterial(ObjectInstance objectInstance, HitInfo hitInfo, float2 uv, float4 tintColor0, float4 tintColor1, inout float4 color, inout bool shouldDiscard) {
+    // List of materials, in priority order
+    const uint kMaterialActorGlint        = (1 << 0);
+    const uint kMaterialActorMultiTexture = (1 << 1);
+    const uint kMaterialActorTint         = (1 << 2);
+    const uint kMaterialActor             = (1 << 3);
+
+    uint actorMaterial;
+    if (objectInstance.flags & kObjectInstanceFlagGlint) {
+        actorMaterial = kMaterialActorGlint;
+    } else if (objectInstance.flags & kObjectInstanceFlagMultiTexture) {
+        actorMaterial = kMaterialActorMultiTexture;
+    } else if ((objectInstance.flags & kObjectInstanceFlagMultiplicativeTint) && !(objectInstance.flags & kObjectInstanceFlagUsesOverlayColor)) {
+        // When both OverlayColor and MultiplicativeTintColor are present, overlay takes priority
+        // and overwrites tintColor1, so we cannot properly support ActorTint while overlay is used.
+        actorMaterial = kMaterialActorTint;
+    } else {
+        actorMaterial = kMaterialActor;
+    }
+
+    float4 tex1;
+    if (objectInstance.secondaryTextureIdx != 0xffff)
+    {
+        tex1 = textures[objectInstance.secondaryTextureIdx].SampleLevel(pointSampler, uv, 0);
+
+        // MASKED_MULTITEXTURE
+        if (objectInstance.flags & kObjectInstanceFlagMaskedMultiTexture)
+        {
+            bool maskedTexture = (tex1.r + tex1.g + tex1.b) * (1.0 - tex1.a) > 0.0;
+            color = maskedTexture ? color : tex1;
+        }
+    }
+
+    // applyChangeColor()
+    if (hitInfo.materialType != MATERIAL_TYPE_ALPHA_TEST || (actorMaterial & (kMaterialActorMultiTexture | kMaterialActorTint)))
+    {
+        // Since it's not currently possible to reliably detect CHANGE_COLOR__MULTI or CHANGE_COLOR__ON
+        // assume that CHANGE_COLOR__ON is always on. CHANGE_COLOR__MULTI is never used in vanilla game so we ignore it here
+        color.rgb *= lerp(1..xxx, tintColor0.rgb, color.a);
+        color.a *= tintColor0.a; // This should be safe as long as tintColor0.a is always 1 by default for actors
+    }
+
+    float alpha = color.a;
+    if (objectInstance.secondaryTextureIdx != 0xffff)
+    {
+        // applySecondColorTint()
+        if ((actorMaterial & kMaterialActorTint) && hitInfo.materialType != MATERIAL_TYPE_ALPHA_BLEND)
+        {
+            alpha = tex1.a;
+            color.rgb = lerp(color.rgb, tintColor1.rgb * tex1.rgb, tex1.a);
+        }
+
+        // MULTI_TEXTURE
+        if (objectInstance.tertiaryTextureIdx != 0xffff && (actorMaterial & kMaterialActorMultiTexture))
+        {
+            // applyMultitextureAlbedo()
+            float4 tex2 = textures[objectInstance.tertiaryTextureIdx].SampleLevel(pointSampler, uv, 0);
+
+            alpha = tex1.a;
+            color.rgb = lerp(color.rgb, tex1.rgb, tex1.a);
+
+            // applySecondTextureColor()
+            #if 0
+            // No way to know whether COLOR_SECOND_TEXTURE is set or not.
+            if (true)
+            {
+                // COLOR_SECOND_TEXTURE
+                if (tex2.a > 0.0)
+                {
+                    color.rgb = lerp(tex2.rgb, tex2.rgb * tintColor0.rgb, tex2.a);
+                }
+            }
+            else
+            {
+                // !COLOR_SECOND_TEXTURE
+                color.rgb = lerp(color.rgb, tex2.rgb, tex2.a);
+            }
+            #else
+            // Combination of the two vanilla approaches above, tho it's technically different from vanilla graphics rendering logic.
+            color.rgb = lerp(color.rgb, tex2.rgb * tintColor0.rgb, tex2.a);
+            #endif
+        }
+    }
+
+    // ALPHA_TEST
+    const float ActorFPEpsilon = 1e-5;
+    if (hitInfo.materialType == MATERIAL_TYPE_ALPHA_TEST)
+    {
+        if (actorMaterial & kMaterialActorTint)
+        {
+            shouldDiscard = (color.a + alpha) < ActorFPEpsilon;
+        }
+        else if (actorMaterial & kMaterialActorMultiTexture)
+        {
+            shouldDiscard = color.a < 0.5 && alpha <= ActorFPEpsilon;
+        }
+        else
+        {
+            // No way to reliably detect CHANGE_COLOR macros, so pick your default logic here.
+            if (true) {
+                // CHANGE_COLOR__ON || CHANGE_COLOR__MULTI 
+                shouldDiscard = alpha < ActorFPEpsilon;
+            } else {
+                // CHANGE_COLOR__OFF
+                shouldDiscard = alpha < 0.5; // Note that this breaks leather armor.
+            }
+        }
+
+        // applyChangeColor()
+        if (actorMaterial & (kMaterialActorGlint | kMaterialActor))
+        {
+            // Since it's not currently possible to reliably detect CHANGE_COLOR__MULTI or CHANGE_COLOR__ON
+            // assume that CHANGE_COLOR__ON is always on. CHANGE_COLOR__MULTI is never used in vanilla game so we ignore it here.
+            color.rgb *= lerp(1..xxx, tintColor0.rgb, color.a);
+            color.a *= tintColor0.a; // No way to detect shouldChangeAlpha so assume that most actors modify alpha.
+        }
+    }
+}
 
 SurfaceInfo MaterialVanilla(HitInfo hitInfo, GeometryInfo geometryInfo, ObjectInstance objectInstance)
 {
@@ -245,14 +364,14 @@ SurfaceInfo MaterialVanilla(HitInfo hitInfo, GeometryInfo geometryInfo, ObjectIn
     {
         // Some held items (bow, crossbow) have identical texture and vertex colors.
         // Reset vertex color if that's the case, to avoid accidentally squaring albedo.
-        vertColor = all(abs(color - vertColor) < 0.001) ? 1 : vertColor;
+        if (all(abs(color - vertColor) < 0.001)) vertColor = 1;
     }
 
     if (isBanner)
     {
         // This logic is used for banners in vanilla MCRTX. This flag is also true for water, 
         // but it doesn't represent how water is rendered in vanilla graphics so here we only apply it to banners.
-        vertColor.rgb = lerp(vertColor.rgb, 1.xxx, color.a); 
+        vertColor.rgb = lerp(vertColor.rgb, 1.xxx, color.a);
     }
 
     // Some surfaces (doors, clouds) have baked-in vanilla shading in vertex color. This code detects and removes this shading, leaving pure unshaded albedo.
@@ -274,132 +393,31 @@ SurfaceInfo MaterialVanilla(HitInfo hitInfo, GeometryInfo geometryInfo, ObjectIn
     }
 
     // ChangeColor
-    float4 tintColor0 = float4((objectInstance.tintColour0 >> 8 * 3) & 0xff, (objectInstance.tintColour0 >> 8 * 2) & 0xff, (objectInstance.tintColour0 >> 8 * 1) & 0xff, (objectInstance.tintColour0 >> 8 * 0) & 0xff) / 255.0;
+    float4 tintColor0 = unpackObjectInstanceTintColor(objectInstance.tintColour0);
     // OverlayColor or MultiplicativeTintColor
-    float4 tintColor1 = float4((objectInstance.tintColour1 >> 8 * 3) & 0xff, (objectInstance.tintColour1 >> 8 * 2) & 0xff, (objectInstance.tintColour1 >> 8 * 1) & 0xff, (objectInstance.tintColour1 >> 8 * 0) & 0xff) / 255.0;
+    float4 tintColor1 = unpackObjectInstanceTintColor(objectInstance.tintColour1);
 
-    // The following material code was created by combining shading logic from Actor, ActorGlint, ActorTint, and ActorMultiTexture materials
-    const bool isActor = objectInstance.flags & (kObjectInstanceFlagHasMotionVectors | kObjectInstanceFlagMaskedMultiTexture | kObjectInstanceFlagMultiTexture | kObjectInstanceFlagMultiplicativeTint | kObjectInstanceFlagUsesOverlayColor | kObjectInstanceFlagGlint) 
-        && !(objectInstance.flags & (kObjectInstanceFlagHasSeasonsTexture | kObjectInstanceFlagClouds | kObjectInstanceFlagChunk | kObjectInstanceFlagSun | kObjectInstanceFlagMoon));
+    const bool isActor = (
+        objectInstance.flags & 
+        (
+            kObjectInstanceFlagHasMotionVectors | 
+            kObjectInstanceFlagMaskedMultiTexture | 
+            kObjectInstanceFlagMultiTexture | 
+            kObjectInstanceFlagMultiplicativeTint | 
+            kObjectInstanceFlagUsesOverlayColor | 
+            kObjectInstanceFlagGlint
+        ) && !(objectInstance.flags & (
+            kObjectInstanceFlagHasSeasonsTexture | 
+            kObjectInstanceFlagClouds | 
+            kObjectInstanceFlagChunk | 
+            kObjectInstanceFlagSun | 
+            kObjectInstanceFlagMoon
+            )
+        )
+    );
+
     if (isActor) {
-        // List of materials, in priority order
-        const uint kMaterialActorGlint        = (1 << 0);
-        const uint kMaterialActorMultiTexture = (1 << 1);
-        const uint kMaterialActorTint         = (1 << 2);
-        const uint kMaterialActor             = (1 << 3);
-
-        uint actorMaterial;
-        if (objectInstance.flags & kObjectInstanceFlagGlint) {
-            actorMaterial = kMaterialActorGlint;
-        } else if (objectInstance.flags & kObjectInstanceFlagMultiTexture) {
-            actorMaterial = kMaterialActorMultiTexture;
-        } else if ((objectInstance.flags & kObjectInstanceFlagMultiplicativeTint) && !(objectInstance.flags & kObjectInstanceFlagUsesOverlayColor)) {
-            // When both OverlayColor and MultiplicativeTintColor are present, overlay takes priority
-            // and overwrites tintColor1, so we cannot properly support ActorTint while overlay is used.
-            actorMaterial = kMaterialActorTint;
-        } else {
-            actorMaterial = kMaterialActor;
-        }
-
-        float4 tex1;
-        if (objectInstance.secondaryTextureIdx != 0xffff)
-        {
-            tex1 = textures[objectInstance.secondaryTextureIdx].SampleLevel(pointSampler, uv, 0);
-
-            // MASKED_MULTITEXTURE
-            if (objectInstance.flags & kObjectInstanceFlagMaskedMultiTexture)
-            {
-                bool maskedTexture = (tex1.r + tex1.g + tex1.b) * (1.0 - tex1.a) > 0.0;
-                color = maskedTexture ? color : tex1;
-            }
-        }
-
-        // applyChangeColor()
-        if (hitInfo.materialType != MATERIAL_TYPE_ALPHA_TEST || (actorMaterial & (kMaterialActorMultiTexture | kMaterialActorTint)))
-        {
-            // Since it's not currently possible to reliably detect CHANGE_COLOR__MULTI or CHANGE_COLOR__ON
-            // assume that CHANGE_COLOR__ON is always on. CHANGE_COLOR__MULTI is never used in vanilla game so we ignore it here
-            color.rgb *= lerp(1..xxx, tintColor0.rgb, color.a);
-            color.a *= tintColor0.a; // This should be safe as long as tintColor0.a is always 1 by default for actors;
-        }
-
-        float alpha = color.a;
-        if (objectInstance.secondaryTextureIdx != 0xffff)
-        {
-            // applySecondColorTint()
-            if ((actorMaterial & kMaterialActorTint) && hitInfo.materialType != MATERIAL_TYPE_ALPHA_BLEND)
-            {
-                alpha = tex1.a;
-                color.rgb = lerp(color.rgb, tintColor1.rgb * tex1.rgb, tex1.a);
-            }
-
-            // MULTI_TEXTURE
-            if (objectInstance.tertiaryTextureIdx != 0xffff && (actorMaterial & kMaterialActorMultiTexture))
-            {
-                // applyMultitextureAlbedo()
-                float4 tex2 = textures[objectInstance.tertiaryTextureIdx].SampleLevel(pointSampler, uv, 0);
-
-                alpha = tex1.a;
-                color.rgb = lerp(color.rgb, tex1.rgb, tex1.a);
-
-                // applySecondTextureColor()
-                #if 0
-                // No way to know whether COLOR_SECOND_TEXTURE is set or not.
-                if (true)
-                {
-                    // COLOR_SECOND_TEXTURE
-                    if (tex2.a > 0.0)
-                    {
-                        color.rgb = lerp(tex2.rgb, tex2.rgb * tintColor0.rgb, tex2.a);
-                    }
-                }
-                else
-                {
-                    // !COLOR_SECOND_TEXTURE
-                    color.rgb = lerp(color.rgb, tex2.rgb, tex2.a);
-                }
-                #else
-                // Combination of the two vanilla approaches above, tho it's technically different from vanilla graphics rendering logic.
-                color.rgb = lerp(color.rgb, tex2.rgb * tintColor0.rgb, tex2.a);
-                #endif
-            }
-        }
-
-        // ALPHA_TEST
-        const float ActorFPEpsilon = 1e-5;
-        if (hitInfo.materialType == MATERIAL_TYPE_ALPHA_TEST)
-        {
-            if (actorMaterial & kMaterialActorTint)
-            {
-                surfaceInfo.shouldDiscard = (color.a + alpha) < ActorFPEpsilon;
-            }
-            else if (actorMaterial & kMaterialActorMultiTexture)
-            {
-                surfaceInfo.shouldDiscard = color.a < 0.5 && alpha <= ActorFPEpsilon;
-            }
-            else
-            {
-                // No way to reliably detect CHANGE_COLOR macros, so pick your default logic here.
-                if (true) {
-                    // CHANGE_COLOR__ON || CHANGE_COLOR__MULTI 
-                    surfaceInfo.shouldDiscard = alpha < ActorFPEpsilon;
-                } else {
-                    // CHANGE_COLOR__OFF
-                    surfaceInfo.shouldDiscard = alpha < 0.5; // Note that this breaks leather armor.
-                }
-            }
-
-            // applyChangeColor()
-            if (actorMaterial & (kMaterialActorGlint | kMaterialActor))
-            {
-                // Since it's not currently possible to reliably detect CHANGE_COLOR__MULTI or CHANGE_COLOR__ON
-                // assume that CHANGE_COLOR__ON is always on. CHANGE_COLOR__MULTI is never used in vanilla game so we ignore it here.
-                color.rgb *= lerp(1..xxx, tintColor0.rgb, color.a);
-                color.a *= tintColor0.a; // No way to detect shouldChangeAlpha so assume that most actors modify alpha.
-            }
-        }
-
-
+        EvaluateActorMaterial(objectInstance, hitInfo, uv, tintColor0, tintColor1, color, surfaceInfo.shouldDiscard);
     }
 
     // applyActorDiffuse()
@@ -478,7 +496,7 @@ SurfaceInfo MaterialVanilla(HitInfo hitInfo, GeometryInfo geometryInfo, ObjectIn
                 texNormal = normalize(texNormal);
             }
             // TODO: in the future make normal computations relative to vertex normal (doesn't make sense to do it now since entities have no PBR textures and blocks have no vertex normals).
-            surfaceInfo.normal = texNormal.x * tangent + texNormal.y * bitangent + texNormal.z * geometryInfo.geometryNormal;
+            surfaceInfo.normal = mul(texNormal, float3x3(tangent, bitangent, geometryInfo.geometryNormal));
         }
     }
 

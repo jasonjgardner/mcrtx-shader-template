@@ -119,19 +119,24 @@ void RenderVanilla(HitInfo hitInfo, inout RayState rayState)
     if (objectInstance.flags & kObjectInstanceFlagGlint)
         emission += (sin(3.0 * g_view.time) * 0.5 + 0.5) * (float3(077, 23, 255) / 255.0);
 
-    uint mediaType = objectInstance.offsetPack5 >> 8;
+    uint mediaType = objectInstance.offsetPack5 >> 8; // See MEDIA_TYPE macros.
 
     // Advance ray forward
     rayState.rayDesc.TMin = hitInfo.rayT;
 
-    // Update values
-    rayState.distance = hitInfo.rayT;
-    rayState.motion = surfaceInfo.position - surfaceInfo.prevPosition;
-
     // Accumulate surface emission and throughput
     rayState.color += emission * rayState.throughput;
     rayState.throughput *= throughput;
+
+    // Update other ray properties
+    rayState.distance = hitInfo.rayT;
+    rayState.motion = surfaceInfo.position - surfaceInfo.prevPosition;
 }
+
+// Set to false by default
+#ifndef CULL_GLASS_BACK_FACES
+#define CULL_GLASS_BACK_FACES 0
+#endif
 
 bool AlphaTestHitLogic(HitInfo hitInfo)
 {
@@ -160,6 +165,7 @@ float3 RenderRay(RayDesc rayDesc, out float outputDistance, out float3 outputMot
     rayState.Init();
     rayState.rayDesc = rayDesc;
 
+    // Limit to 100 overlapping translucent surfaces.
     for (int i = 0; i < 100; i++)
     {
         q.TraceRayInline(SceneBVH, RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, rayState.instanceMask, rayState.rayDesc);

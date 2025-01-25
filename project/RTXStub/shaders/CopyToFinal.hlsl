@@ -1,4 +1,5 @@
 #include "Include/Generated/Signature.hlsl"
+#include "Include/Util.hlsl"
 
 [numthreads(16, 16, 1)]
 void CopyToFinal(
@@ -13,8 +14,7 @@ void CopyToFinal(
 
     if (any(dispatchThreadID.xy >= g_view.displayResolution)) return;
 
-    bool enabledUpscaling = !g_view.enableTAA && g_view.renderResolution.x < g_view.displayResolution.x;
-    if (enabledUpscaling) {
+    if (isUpscalingEnabled()) {
         // Pick up upscaled results from inputThisFrameTAAHistory
         float4 upscaledColor = inputThisFrameTAAHistory[dispatchThreadID.xy];
         outputBufferFinal[dispatchThreadID.xy] = upscaledColor;

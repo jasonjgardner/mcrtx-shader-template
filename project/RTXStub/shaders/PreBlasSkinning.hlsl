@@ -1,4 +1,5 @@
 #include "Include/Generated/Signature.hlsl"
+#include "Include/Util.hlsl"
 
 [numthreads(64, 1, 1)]
 void PreBlasSkinning(
@@ -41,10 +42,8 @@ void PreBlasSkinning(
     destBuffer.Store<float16_t4>(addressTo + g_meshSkinningData.offsetToPosition, pos);
 
     uint normalPacked = sourceBuffer.Load<uint>(addressFrom + g_meshSkinningData.offsetToNormal);
-    float4 normal = float4((int)((normalPacked << 8*3) & 0xff000000) >> 24, (int)((normalPacked << 8*2) & 0xff000000) >> 24, (int)((normalPacked << 8*1) & 0xff000000) >> 24, (int)((normalPacked << 8*0) & 0xff000000) >> 24) / 127.0;
+    float4 normal = unpackNormal(normalPacked);
     normal = mul(bone, normal);
     normal.xyz = normalize(normal.xyz);
-    int4 normalInt = int4(round(normal*127));
-    normalPacked = ((uint)(normalInt.x << 24) >> 8*3) | ((uint)(normalInt.y << 24) >> 8*2) | ((uint)(normalInt.z << 24) >> 8*1) | ((uint)(normalInt.w << 24) >> 8*0);
-    destBuffer.Store(addressTo + g_meshSkinningData.offsetToNormal, normalPacked);
+    destBuffer.Store(addressTo + g_meshSkinningData.offsetToNormal, packNormal(normal));
 }
