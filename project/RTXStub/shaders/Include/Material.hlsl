@@ -95,7 +95,7 @@ GeometryInfo GetGeometryInfo(HitInfo hitInfo, ObjectInstance objectInstance) {
     uint uv3ByteOffset = objectInstance.offsetPack4 & 0xff;
     uint PBRTextureIdByteOffset = objectInstance.offsetPack4 >> 8;
     uint previousPositionOffset = objectInstance.offsetPack5 & 0xff;
-    uint mediaType = objectInstance.offsetPack5 >> 8; // See MEDIA_TYPE macros.
+    uint mediaType = objectInstance.offsetPack5 >> 8; // See MEDIA_TYPE macros in Constants.hlsl
 
     ByteAddressBuffer vertexBuffer = vertexBuffers[objectInstance.vbIdx];
 

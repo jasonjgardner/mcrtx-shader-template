@@ -2,10 +2,6 @@
 
 This is a basic template shader for Bedrock RTX, written from scratch. It utilizes some auto-generation scripts to extract information such as buffers and structs from material.bin files and insert that information into code, which allows to easily adapt to any changes in shaders that may be introduced with game updates and it also provides some transparency for where some of the code here is coming from.
 
-## Work In Progress!
-
-This is still a WIP as I'm releasing this earlier than planned and I will be actively refactoring and updating this repository in the near future (and also intend to maintain & update it in the long term, to accommodate every game update that may change something in RTX). This section will be removed once I am happy with the state of this project.
-
 ## Repository Structure
 
 This repository can be divided into 4 folders:
@@ -50,12 +46,12 @@ Included features:
 - Fixes for some common RTX bugs (banner UVs, door/cloud vertex shading, darkening of certain items)
 - Upscaling support (DLSS, etc)
 - Complete resource signature of MCRTX pipeline (see `RTXStub/Include/Generated/`)
-- Root constants in every pass
+- Implemented root constants for every pass
 - Entity skinning implementation
 
-The following render passes are part of the example implementation:
+The following render passes are part of the provided example implementation:
 
-- `PreBlasSkinning` - necessary pass to animate geometry of actors and entities as well as to create their motion vectors.
+- `PreBlasSkinning` - necessary pass to animate geometry of actors and entities as well as to compute their motion vectors.
 - `PrimaryCheckerboardRayGenInline` - main ray tracing shader logic.
 - `CopyToFinal` - transfers upscaled image to final output buffer.
 
@@ -68,7 +64,7 @@ This is a table with high-level description of MCRTX pipeline, sorted in the seq
 Dispatch Grid legend
 
 - Screen - dispatches a thread for every pixel of game window
-- Render - dispatched a thread for every pixel of internal rendering buffer
+- Render - dispatches a thread for every pixel of internal rendering buffer
 - Denoiser - set of denoiser buffers, 1px = 4x4 Render pixels
 - Inscatter - volumetric buffers, 256 x 128 x 64
 - Gi Inscatter - volumetric GI buffers, 128 x 64 x 32

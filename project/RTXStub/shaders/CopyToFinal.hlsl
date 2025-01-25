@@ -35,6 +35,7 @@ void CopyToFinal(
     // *cricket noises*
     // Note that g_rootConstant0 from FinalCombine pass is accessible here
 
+    // Below code is part of the example ray tracing shader implementation.
     if (any(dispatchThreadID.xy >= g_view.displayResolution)) return;
 
     if (isUpscalingEnabled()) {

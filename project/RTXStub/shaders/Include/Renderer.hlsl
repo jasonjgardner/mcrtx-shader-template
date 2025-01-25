@@ -56,7 +56,7 @@ struct RayState
     float distance;
     float3 motion;
 
-    uint instanceMask; // 8 bits, see INSTANCE_MASK macros.
+    uint instanceMask; // 8 bits, see INSTANCE_MASK macros in Constants.hlsl
 
     void Init()
     {
@@ -142,7 +142,7 @@ void RenderVanilla(HitInfo hitInfo, inout RayState rayState)
     if (objectInstance.flags & kObjectInstanceFlagGlint)
         emission += (sin(3.0 * g_view.time) * 0.5 + 0.5) * (float3(077, 23, 255) / 255.0);
 
-    uint mediaType = objectInstance.offsetPack5 >> 8; // See MEDIA_TYPE macros.
+    uint mediaType = objectInstance.offsetPack5 >> 8; // See MEDIA_TYPE macros in Constants.hlsl.
 
     // Advance ray forward
     rayState.rayDesc.TMin = hitInfo.rayT;
