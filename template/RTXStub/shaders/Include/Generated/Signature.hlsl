@@ -36,7 +36,7 @@
 
 // For the most part, every single buffer here is accessible in every single pass.
 // The only exception is PreBlasSkinningCB buffer which is only accessible in PreBlasSkinning pass
-// and that same pass only has access to PreBlasSkinning and a single descriptor table
+// and that same pass only has access to PreBlasSkinningCB and a single descriptor table
 // with the following buffers: indexBuffers, vertexBuffers, faceDataBuffers, faceUvBuffers, 
 // vertexIrradianceCache, faceIrradianceCache, faceDataBuffersRW, faceUvBuffersRW, vertexBuffersRW
 
