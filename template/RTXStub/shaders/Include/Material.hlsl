@@ -133,6 +133,9 @@ GeometryInfo GetGeometryInfo(HitInfo hitInfo, ObjectInstance objectInstance) {
         geometryInfo.uv0 += geometryInfo.barycentric[i] * uvs[i];
     }
 
+    // Catch cases where vertex color is not provided (block breaking overlay).
+    if (!colorByteOffset) geometryInfo.color = 1;
+
     geometryInfo.geometryNormal = normalize(cross((positions[1] - positions[0]), (positions[2] - positions[0])));
     // vertexNormal = normalize(vertexNormal); // Vertex normal is not normalized as GeometryInfo is meant to pass raw attribute values.
 
@@ -390,11 +393,11 @@ SurfaceInfo MaterialVanilla(HitInfo hitInfo, GeometryInfo geometryInfo, ObjectIn
         if (all(abs(color - vertColor) < 0.001)) vertColor = 1;
     }
 
-    if (objectInstance.flags & kObjectInstanceFlagTextureAlphaControlsVertexColor && hitInfo.materialType != MATERIAL_TYPE_WATER)
+    if (isBanner)
     {
-        // This logic is used for banners and the block breaking texture in vanilla MCRTX. This
-        // flag is also true for water, but it doesn't represent how water is rendered in vanilla
-        // graphics so here we exclude this logic for water.
+        // This logic is used for banners in vanilla MCRTX, to work around the issue of their provided vertex color being 0.
+        // This flag is also true for water and block breaking overlay, but it doesn't represent how they are rendered 
+        // in vanilla graphics so here we only apply it to banners.
         vertColor.rgb = lerp(vertColor.rgb, 1.xxx, color.a);
     }
 

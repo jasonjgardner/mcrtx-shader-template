@@ -123,6 +123,8 @@ void RenderVanilla(HitInfo hitInfo, inout RayState rayState)
         light += 100 * attenuation * lightData.intensity * lightData.color;
     }
 
+    const bool isBlockBreakingOverlay = objectInstance.flags == (kObjectInstanceFlagAlphaTestThresholdHalf | kObjectInstanceFlagTextureAlphaControlsVertexColor);
+
     float3 throughput;
     float3 emission;
     if (objectInstance.flags & (kObjectInstanceFlagSun | kObjectInstanceFlagMoon))
@@ -130,6 +132,12 @@ void RenderVanilla(HitInfo hitInfo, inout RayState rayState)
         // Use additive blending for sun and moon
         throughput = 1;
         emission = surfaceInfo.color * ((objectInstance.flags & kObjectInstanceFlagSun ? g_view.sunMeshIntensity : g_view.moonMeshIntensity) * surfaceInfo.alpha);
+    }
+    else if (isBlockBreakingOverlay)
+    {
+        // Use multiplicative blending for block breaking overlay geometry
+        throughput = surfaceInfo.color;
+        emission = 0;
     }
     else
     {
