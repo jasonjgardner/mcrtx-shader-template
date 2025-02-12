@@ -356,7 +356,7 @@ SurfaceInfo MaterialVanilla(HitInfo hitInfo, GeometryInfo geometryInfo, ObjectIn
     float4 vertColor = geometryInfo.color;
     float2 uv = geometryInfo.uv0;
 
-    bool isBanner = objectInstance.flags & kObjectInstanceFlagTextureAlphaControlsVertexColor && hitInfo.materialType != MATERIAL_TYPE_WATER;
+    bool isBanner = objectInstance.flags & kObjectInstanceFlagTextureAlphaControlsVertexColor && hitInfo.materialType == MATERIAL_TYPE_OPAQUE;
 
     Texture2D colorTex = textures[objectInstance.colourTextureIdx != 0xffff ? objectInstance.colourTextureIdx : g_view.missingTextureIndex];
     if (objectInstance.colourTextureIdx != 0xffff)
@@ -390,10 +390,11 @@ SurfaceInfo MaterialVanilla(HitInfo hitInfo, GeometryInfo geometryInfo, ObjectIn
         if (all(abs(color - vertColor) < 0.001)) vertColor = 1;
     }
 
-    if (isBanner)
+    if (objectInstance.flags & kObjectInstanceFlagTextureAlphaControlsVertexColor && hitInfo.materialType != MATERIAL_TYPE_WATER)
     {
-        // This logic is used for banners in vanilla MCRTX. This flag is also true for water, 
-        // but it doesn't represent how water is rendered in vanilla graphics so here we only apply it to banners.
+        // This logic is used for banners and the block breaking texture in vanilla MCRTX. This
+        // flag is also true for water, but it doesn't represent how water is rendered in vanilla
+        // graphics so here we exclude this logic for water.
         vertColor.rgb = lerp(vertColor.rgb, 1.xxx, color.a);
     }
 
