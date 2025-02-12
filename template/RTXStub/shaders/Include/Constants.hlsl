@@ -78,4 +78,6 @@ static const uint kPBRTextureDataFlagHasHeightMapTexture  = (1 << 3);
 static const int kAdaptiveDenoiserLightFlagAddedToList      = (1 << 0);
 static const int kAdaptiveDenoiserLightFlagRemovedFromList  = (1 << 1);
 
+#define PI 3.14159265358979323846
+
 #endif

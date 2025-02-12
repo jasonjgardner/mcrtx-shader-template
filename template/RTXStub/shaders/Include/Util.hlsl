@@ -25,6 +25,7 @@
 #define __UTIL_HLSL__
 
 #include "Generated/Signature.hlsl"
+#include "Constants.hlsl"
 
 uint3 getDispatchDimensions() {
     return uint3(
@@ -113,6 +114,22 @@ float2 unpackVertexUV(uint packedUV) {
     // Quantize UVs according to max possible atlas size (32k on NVidia), fixes visible texture seams on certain objects.
     uv = round(uv*32768)/32768.0;
     return uv;
+}
+
+// Determine whether g_view.directionToSun is actually direction to moon.
+bool isMoonPrimaryLight() {
+    float angle1 = g_view.sunAzimuth - PI;
+    float angle2 = atan2(g_view.directionToSun.z, g_view.directionToSun.x);
+    float angleDiff = abs(angle1-angle2);
+    return min(angleDiff, (2*PI)-angleDiff) > 0.001;
+}
+
+float3 getTrueDirectionToSun() {
+    return isMoonPrimaryLight() ? -g_view.directionToSun : g_view.directionToSun;
+}
+
+float3 getTrueDirectionToMoon() {
+    return isMoonPrimaryLight() ? g_view.directionToSun : -g_view.directionToSun;
 }
 
 #endif

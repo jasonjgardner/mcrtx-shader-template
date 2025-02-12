@@ -74,12 +74,22 @@ void RenderSky(inout RayState rayState)
 
     const float3 skyColor = float3(170, 209, 254) / 255;
     const float3 gradientColor = float3(121, 167, 255) / 255;
+    
+    const float3 nightSkyColor = float3(10, 12, 22) / 255;
+    const float3 nightGradientColor = float3(1, 1, 2) / 255;
+    
+    float gradientLerp = max(0.0, lerp(-0.15, 1.0, rayState.rayDesc.Direction.y));
+    gradientLerp = pow(gradientLerp, 0.5);
 
-    float lerpfactor = max(0.0, lerp(-0.15, 1.0, rayState.rayDesc.Direction.y));
-    lerpfactor = pow(lerpfactor, 0.5);
+    const float nightThreshold = -0.3;
+    const float dayThreshold = 0.2;
+    float timeOfDayLerp = saturate((getTrueDirectionToSun().y - nightThreshold) / (dayThreshold - nightThreshold));
 
-    float3 color = lerp(skyColor, gradientColor, lerpfactor);
-    rayState.color += rayState.throughput * color;
+    float3 dayColor = lerp(skyColor, gradientColor, gradientLerp);
+    float3 nightColor = lerp(nightSkyColor, nightGradientColor, gradientLerp);
+
+    float3 finalColor = lerp(nightColor, dayColor, timeOfDayLerp);
+    rayState.color += rayState.throughput * finalColor;
 }
 
 void RenderVanilla(HitInfo hitInfo, inout RayState rayState)
