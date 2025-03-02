@@ -49,7 +49,7 @@ Included features:
 - Implemented root constants for every pass
 - Entity skinning implementation
 
-The following render passes are part of the provided example implementation:
+The following compute passes are part of the provided example implementation:
 
 - `PreBlasSkinning` - necessary pass to animate geometry of actors and entities as well as to compute their motion vectors.
 - `PrimaryCheckerboardRayGenInline` - main ray tracing shader logic.

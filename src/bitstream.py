@@ -53,10 +53,10 @@ class BitStream:
     def read_vbr(self, size: int = 0):
         value = 0
         offset = 0
-        keeep_going = True
-        while keeep_going:
+        keep_going = True
+        while keep_going:
             value |= self.read(size - 1) << offset * (size - 1)
-            keeep_going = self.read(1) == 1
+            keep_going = self.read(1) == 1
             offset += 1
 
         return value

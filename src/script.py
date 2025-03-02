@@ -50,7 +50,7 @@ def process_text_file(text: str, token_mapping: dict[str, str]):
 
 def analyze_rtxstub(mat: Material, template_token_mapping: dict[str, str]):
     """
-    Extracts useful data fron RTXStub and populates `template_token_mapping` based on gathered data.
+    Extracts useful data from RTXStub and populates `template_token_mapping` based on gathered data.
     """
     print(f"Analyzing {mat.name}...")
 
@@ -133,7 +133,7 @@ def analyze_postfx_materials(
     mats: list[Material], template_token_mapping: dict[str, str]
 ):
     """
-    Extracts useful data fron PostFX materials and populates `template_token_mapping` based on gathered data.
+    Extracts useful data from PostFX materials and populates `template_token_mapping` based on gathered data.
     """
     for mat in mats:
         name = mat.name
