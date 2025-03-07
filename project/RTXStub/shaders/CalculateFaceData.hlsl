@@ -9,7 +9,7 @@ void CalculateFaceData(
     )
 {
     uint faceQuadId = dispatchThreadID.x;
-	uint objectInstanceIndex = g_rootConstant0;
+    uint objectInstanceIndex = g_rootConstant0;
     uint numOfQuadsInObject = g_rootConstant1;
 
     if (faceQuadId >= numOfQuadsInObject) return;
