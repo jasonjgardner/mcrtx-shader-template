@@ -143,7 +143,7 @@ Texture2D<float4> referencePathTracerBuffer : register(t31); // {{RTXStub.buffer
 // Uninitialized // {{RTXStub.buffers.t32_space0}}
 // Uninitialized // {{RTXStub.buffers.t33_space0}}
 // Uninitialized // {{RTXStub.buffers.t34_space0}}
-{{RTXStub.buffers.t35_space0}} // 8192
+{{RTXStub.buffers.t35_space0}} // 12288
 Texture2D<uint> inputBufferToneMappingHistogram : register(t36); // {{RTXStub.buffers.t36_space0}} // R32_UINT 256⨯1
 Texture2D<float> inputBufferToneCurve : register(t37); // {{RTXStub.buffers.t37_space0}} // R32_FLOAT 256⨯1
 {{RTXStub.buffers.t38_space0}} // R16G16B16A16_FLOAT 128⨯64x32
