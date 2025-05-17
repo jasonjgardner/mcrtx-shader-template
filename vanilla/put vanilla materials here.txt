@@ -1,2 +1,0 @@
-Place your vanilla material.bin files here.
-RTXStub.material.bin, RTXPostFX.Bloom.material.bin, RTXPostFX.Tonemapping.material.bin are required.
