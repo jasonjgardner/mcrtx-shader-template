@@ -3,7 +3,6 @@
 This directory needs to contain the following files:
 
 - RTXStub.material.bin
-- RTXPostFX.material.bin
 - RTXPostFX.Bloom.material.bin
 - RTXPostFX.Tonemapping.material.bin
 
