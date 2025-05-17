@@ -1,0 +1,22 @@
+{
+    "name": "Minecraft RTX Shader Development",
+    "image": "ghcr.io/jasonjgardner/dxc-docker:latest",
+    "features": {
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.12",
+            "installTools": false
+        }
+    },
+    "postCreateCommand": "pip install lazurite",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "slevesque.shader",
+                "a2k.hlsl-preview"
+            ]
+        }
+    },
+    "forwardPorts": [],
+    "remoteUser": "vscode"
+}
