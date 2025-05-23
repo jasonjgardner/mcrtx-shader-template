@@ -1,0 +1,31 @@
+name: Compile Shaders
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/jasonjgardner/dxc-docker:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          
+      - name: Install Lazurite
+        run: |
+          python -m pip install --upgrade pip
+          pip install lazurite
+      - name: Compile Shaders
+        run: |
+          mkdir -p output
+          lazurite build project/ -o ./output
+      - name: Upload compiled shaders
+        uses: actions/upload-artifact@v3
+        with:
+          name: compiled-shaders
+          path: output
